@@ -3,16 +3,26 @@
     <h1 class="text-h4 font-weight-bold">PBJ FILMS (v2)</h1>
   </div>  <!-- <v-img class="mb-4" height="150" src="@/assets/logo.png" /> -->
   <v-container fluid>
-    <v-row>
-      <v-col class="d-flex flex-wrap">
+    <v-row align="center" class="fill-height" justify="center">
+      <v-col class="d-flex flex-wrap" cols="12" justify="around">
+
         <v-card
-          v-for="movie in movies"
+          v-for="(movie, index) in movies"
           :key="movie.tmdb_id"
           align="center"
-          class="mx-auto"
+          class="mx-auto pa-2 ma-2"
         >
-          <v-img v-if="movie.poster_path" height="200px" :src="movie.poster_path" />
-          <v-card-title>{{ movie.title }}</v-card-title>
+          <v-img
+            v-if="movie.poster_path"
+            class="mx-auto pa-2 ma-2"
+            cover
+            height="225px"
+            :src="movie.poster_path"
+          />
+
+          <!-- <v-card-title class="d-inline-block text-truncate">{{ movie.title }}</v-card-title> -->
+          <!-- <v-card-title class="d-inline-block text-truncate">{{ movie.tmdb_id }}</v-card-title> -->
+
           <v-card-subtitle>{{
             movie.credits.crew.find(person => person.job ===
               "Director").name }}
@@ -30,17 +40,16 @@
             </v-badge>
           </div>
 
+          <v-chip color="secondary">{{ movieNumber(index) }}</v-chip>
+
           <v-card-actions class="justify-center">
-            <v-btn color="orange-lighten-2" text="Show Cast" />
-            <v-spacer />
-            <v-btn :icon="show ? 'mdi-chevron-up' : 'mdi-chevron-down'" @click="show = !show" />
+            <v-btn color="orange-lighten-2" text="Show Cast" @click="onShowCastClick(movie)" />
 
           </v-card-actions>
 
           <v-expand-transition>
-            <div v-show="show">
+            <div v-if="movie.movieCastVisible">
               <v-divider />
-
               <v-list-item
                 v-for="person in movie.credits.cast.slice(0, 9)"
                 :key="person.id"
@@ -53,7 +62,8 @@
           <v-list-item />
         </v-card>
       </v-col>
-    </v-row></v-container>
+    </v-row>
+  </v-container>
 
 </template>
 
@@ -68,8 +78,18 @@
   //   return Math.ceil(movies.value.length / itemsPerPage.value)
   // })
 
+  function onShowCastClick (movie) {
+    console.log('Showing cast')
+    // show.value = !show.value
+    movie.movieCastVisible = !movie.movieCastVisible
+  }
+
+  function movieNumber (index) {
+    return movies.value.length - index
+  }
+
   async function getMovies () {
-    const { data } = await supabase.from('pbj-movies').select().order('date_watched', { ascending: false }).range(0, 5)
+    const { data } = await supabase.from('pbj-movies').select().order('date_watched', { ascending: false })
     movies.value = data
 
     for (const movie of movies.value) {
@@ -92,15 +112,14 @@
         // .then(res => console.log(res))
         .catch(error => console.error(error))
 
-      if (!response.ok) {
+      if (!response) {
         throw new Error('Could not fetch resource.')
       }
 
       const data = await response.json()
-      console.log(data)
-      console.log(data.poster_path)
-      console.log(`https://image.tmdb.org/t/p/original${data.poster_path}`)
-
+      // console.log(data);
+      // console.log(data.poster_path);
+      // console.log(`https://image.tmdb.org/t/p/original${data.poster_path}`);
 
       const { error } = await supabase.from('pbj-movies').update({ poster_path: `https://image.tmdb.org/t/p/original${data.poster_path}` }).eq('tmdb_id', movie.tmdb_id)
     }
@@ -110,3 +129,6 @@
     getMovies()
   })
 </script>
+
+<style scoped>
+</style>
