@@ -17,8 +17,8 @@
             class="mx-auto pa-2 ma-2"
             cover
             height="450px"
-            width="300px"
             :src="movie.poster_path"
+            width="300px"
           />
 
           <!-- <v-card-title class="d-inline-block text-truncate">{{ movie.title }}</v-card-title> -->
@@ -26,6 +26,10 @@
 
           <v-card-subtitle>{{ getDirector(movie) }}
           </v-card-subtitle>
+
+          <v-badge v-if="movie.release_date" color="primary" :content="movie.release_date" inline>
+            <v-icon icon="mdi-cake" />
+          </v-badge>
 
           <div class="d-flex ga-12 justify-center mb-2">
             <v-badge
@@ -42,8 +46,8 @@
           <v-chip color="secondary">{{ movieNumber(index) }}</v-chip>
 
           <v-card-actions class="justify-center">
-            <v-btn color="orange-lighten-2" text="Show Cast" @click="onShowCastClick(movie)" />
-            <v-btn :style="{color: movie.oscars ? 'green' : 'orange-lighten-2'}" text="Show Oscars" @click="onShowOscarsClick(movie)" />
+            <v-btn class="text-amber" text="Show Cast" @click="onShowCastClick(movie)" />
+            <v-btn :style="movie.oscars ? 'color:teal' : 'color:amber'" text="Show Oscars" @click="onShowOscarsClick(movie)" />
 
           </v-card-actions>
 
@@ -59,12 +63,16 @@
             </div>
           </v-expand-transition>
 
-          <v-expand-transition>
+          <!-- <v-expand-transition>
             <div v-if="movie.oscarsVisible">
               <v-divider />
-              {{ showNumberOfOscarNoms(movie) }}
+              {{ analyzeOscars(movie.oscars) }}
             </div>
-          </v-expand-transition>
+          </v-expand-transition> -->
+
+          <v-dialog v-model="movie.oscarsVisible" width="auto">
+            <v-card prepend-icon="mdi-trophy"><v-card-text><pre>{{ formatOscarResults(analyzeOscars(movie.oscars)) }}</pre></v-card-text></v-card>
+          </v-dialog>
 
           <v-list-item />
         </v-card>
@@ -88,7 +96,7 @@
     movies.value = data
 
     for (const movie of movies.value) {
-      getPoster(movie)
+      getDetails(movie)
       getOscars(movie)
     }
   }
@@ -109,15 +117,80 @@
       === 'Director').name
   }
 
-  function showNumberOfOscarNoms (movie) {
-    if (!movie.oscars) {
-      return `Oscar Nominations: 0`
+  function analyzeOscars (data) {
+    const wins = data.filter(item => item.isWinner === '1')
+    const allNominations = data // All entries are nominations (wins are nominations that won)
+
+    // Get categories for all nominations
+    const nominationCategories = allNominations.map(item => item.category)
+
+    // Get acting nominations with names
+    const actingNominations = allNominations
+      .filter(item => item.isActing === '1')
+      .map(item => ({
+        category: item.category,
+        names: item.names.map(n => n.name),
+      }))
+
+    // Get categories for wins
+    const winCategories = wins.map(item => item.category)
+
+    // Get acting wins with names
+    const actingWins = wins
+      .filter(item => item.isActing === '1')
+      .map(item => ({
+        category: item.category,
+        names: item.names.map(n => n.name),
+      }))
+
+    return {
+      totalNominations: allNominations.length,
+      nominationCategories: nominationCategories,
+      actingNominations: actingNominations,
+      totalWins: wins.length,
+      winCategories: winCategories,
+      actingWins: actingWins,
     }
-    return `Oscar Nominations: ${movie.oscars.length}`
   }
 
-  async function getPoster (movie) {
-    if (!movie.poster_path) {
+  function formatOscarResults (results) {
+    let output = '=== OSCAR ANALYSIS ===\n\n'
+
+    output += `Total Nominations: ${results.totalNominations}\n`
+    output += 'Categories:\n'
+    for (const [i, cat] of results.nominationCategories.entries()) {
+      output += `  ${i + 1}. ${cat}\n`
+    }
+
+    if (results.actingNominations.length > 0) {
+      output += '\nActing Nominations:\n'
+      for (const nom of results.actingNominations) {
+        output += `  • ${nom.category}: ${nom.names.join(', ')}\n`
+      }
+    }
+
+    output += `\nTotal Wins: ${results.totalWins}\n`
+    if (results.totalWins > 0) {
+      output += 'Categories:\n'
+      for (const [i, cat] of results.winCategories.entries()) {
+        output += `  ${i + 1}. ${cat}\n`
+      }
+
+      if (results.actingWins.length > 0) {
+        output += '\nActing Wins:\n'
+        for (const win of results.actingWins) {
+          output += `  • ${win.category}: ${win.names.join(', ')}\n`
+        }
+      }
+    } else {
+      output += 'No wins\n'
+    }
+
+    return output
+  }
+
+  async function getDetails (movie) {
+    if (!movie.poster_path || !movie.release_date) {
       const options = {
         method: 'GET',
         headers: {
@@ -127,8 +200,6 @@
       }
 
       const response = await fetch(`https://api.themoviedb.org/3/movie/${movie.tmdb_id}?language=en-US`, options)
-        // .then(res => res.json())
-        // .then(res => console.log(res))
         .catch(error => console.error(error))
 
       if (!response) {
@@ -136,11 +207,12 @@
       }
 
       const data = await response.json()
-      // console.log(data);
-      // console.log(data.poster_path);
-      // console.log(`https://image.tmdb.org/t/p/original${data.poster_path}`);
-
-      const { error } = await supabase.from('pbj-movies').update({ poster_path: `https://image.tmdb.org/t/p/original${data.poster_path}` }).eq('tmdb_id', movie.tmdb_id)
+      if (!movie.poster_path) {
+        const { error } = await supabase.from('pbj-movies').update({ poster_path: `https://image.tmdb.org/t/p/original${data.poster_path}` }).eq('tmdb_id', movie.tmdb_id)
+      } else if (!movie.release_date) {
+        // console.log(data.release_date).slice(0, 3)
+        const { error } = await supabase.from('pbj-movies').update({ release_date: data.release_date.slice(0, 4) }).eq('tmdb_id', movie.tmdb_id)
+      }
     }
   }
 
