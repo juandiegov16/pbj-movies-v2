@@ -16,16 +16,15 @@
             v-if="movie.poster_path"
             class="mx-auto pa-2 ma-2"
             cover
-            height="225px"
+            height="450px"
+            width="300px"
             :src="movie.poster_path"
           />
 
           <!-- <v-card-title class="d-inline-block text-truncate">{{ movie.title }}</v-card-title> -->
           <!-- <v-card-title class="d-inline-block text-truncate">{{ movie.tmdb_id }}</v-card-title> -->
 
-          <v-card-subtitle>{{
-            movie.credits.crew.find(person => person.job ===
-              "Director").name }}
+          <v-card-subtitle>{{ getDirector(movie) }}
           </v-card-subtitle>
 
           <div class="d-flex ga-12 justify-center mb-2">
@@ -44,6 +43,7 @@
 
           <v-card-actions class="justify-center">
             <v-btn color="orange-lighten-2" text="Show Cast" @click="onShowCastClick(movie)" />
+            <v-btn :style="{color: movie.oscars ? 'green' : 'orange-lighten-2'}" text="Show Oscars" @click="onShowOscarsClick(movie)" />
 
           </v-card-actions>
 
@@ -59,6 +59,13 @@
             </div>
           </v-expand-transition>
 
+          <v-expand-transition>
+            <div v-if="movie.oscarsVisible">
+              <v-divider />
+              {{ showNumberOfOscarNoms(movie) }}
+            </div>
+          </v-expand-transition>
+
           <v-list-item />
         </v-card>
       </v-col>
@@ -70,31 +77,43 @@
 <script setup>
   import { supabase } from '../utils/supabase'
   const movies = ref([])
-  const show = ref(false)
   // const page = ref(1)
   // const itemsPerPage = ref(5)
 
   // const pageCount = computed(() => {
   //   return Math.ceil(movies.value.length / itemsPerPage.value)
   // })
-
-  function onShowCastClick (movie) {
-    console.log('Showing cast')
-    // show.value = !show.value
-    movie.movieCastVisible = !movie.movieCastVisible
-  }
-
-  function movieNumber (index) {
-    return movies.value.length - index
-  }
-
   async function getMovies () {
     const { data } = await supabase.from('pbj-movies').select().order('date_watched', { ascending: false })
     movies.value = data
 
     for (const movie of movies.value) {
       getPoster(movie)
+      getOscars(movie)
     }
+  }
+  function onShowCastClick (movie) {
+    movie.movieCastVisible = !movie.movieCastVisible
+  }
+
+  function onShowOscarsClick (movie) {
+    movie.oscarsVisible = !movie.oscarsVisible
+  }
+
+  function movieNumber (index) {
+    return movies.value.length - index
+  }
+
+  function getDirector (movie) {
+    return movie.credits.crew.find(person => person.job
+      === 'Director').name
+  }
+
+  function showNumberOfOscarNoms (movie) {
+    if (!movie.oscars) {
+      return `Oscar Nominations: 0`
+    }
+    return `Oscar Nominations: ${movie.oscars.length}`
   }
 
   async function getPoster (movie) {
@@ -122,6 +141,19 @@
       // console.log(`https://image.tmdb.org/t/p/original${data.poster_path}`);
 
       const { error } = await supabase.from('pbj-movies').update({ poster_path: `https://image.tmdb.org/t/p/original${data.poster_path}` }).eq('tmdb_id', movie.tmdb_id)
+    }
+  }
+
+  async function getOscars (movie) {
+    if (!movie.oscars) {
+      const response = await fetch(`https://web-production-b8145.up.railway.app/awards/tmdb/${movie.tmdb_id}`).catch(error => console.error(error))
+      if (!response) {
+        throw new Error('Could not fetch Oscar noms and awards.')
+      }
+      const data = await response.json()
+      // console.log(data)
+
+      const { error } = await supabase.from('pbj-movies').update({ oscars: data }).eq('tmdb_id', movie.tmdb_id)
     }
   }
 
