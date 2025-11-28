@@ -28,7 +28,7 @@
           <v-badge v-if="movie.release_date" color="primary" :content="movie.release_date" inline>
             <v-icon icon="mdi-cake" />
           </v-badge>
-
+          <v-badge color="warning" :content="`${movie.runtime} min`" inline><v-icon icon="mdi-clock" /></v-badge>
           <v-badge
             bordered
             color="success"
