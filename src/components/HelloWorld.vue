@@ -2,7 +2,7 @@
   <div class="my-4 text-center justify-center ">
     <h1 class="text-h4 font-weight-bold">PBJ FILMS (v2) </h1>
     <!-- <FlagIcon circle code="us" size="32" /> -->
-  </div>  <!-- <v-img class="mb-4" height="150" src="@/assets/logo.png" /> -->
+  </div>
   <v-container fluid>
     <v-row align="center" class="fill-height" justify="center">
       <v-col class="d-flex flex-wrap" cols="12" justify="around">
@@ -11,7 +11,7 @@
           v-for="(movie, index) in movies"
           :key="movie.tmdb_id"
           align="center"
-          class="mx-auto pa-2 ma-2"
+          class="mx-auto"
         >
           <v-img
             v-if="movie.poster_path"
@@ -22,10 +22,7 @@
             width="300px"
           />
 
-          <!-- <v-card-title class="d-inline-block text-truncate">{{ movie.title }}</v-card-title> -->
-          <!-- <v-card-title class="d-inline-block text-truncate">{{ movie.tmdb_id }}</v-card-title> -->
-
-          <v-card-subtitle><v-badge :content="getDirector(movie)" inline><v-icon icon="mdi-movie-open" /></v-badge>
+          <v-card-subtitle v-if="movie.director"><v-badge :content="movie.director" inline><v-icon icon="mdi-movie-open" /></v-badge>
           </v-card-subtitle>
 
           <v-badge v-if="movie.release_date" color="primary" :content="movie.release_date" inline>
@@ -42,9 +39,7 @@
             <v-icon icon="mdi-calendar" />
           </v-badge>
 
-          <v-badge color="secondary" :content="movieNumber(index)" inline><v-icon icon="counter" /></v-badge>
-
-          <!-- <v-chip color="secondary">{{ movieNumber(index) }}</v-chip> -->
+          <v-badge color="secondary" :content="movieNumber(index)" inline><v-icon icon="mdi-counter" /></v-badge>
 
           <v-card-actions class="justify-center">
             <v-btn class="text-amber" icon="mdi-account-group" @click="onShowCastClick(movie)" />
@@ -52,20 +47,8 @@
 
           </v-card-actions>
 
-          <!-- <v-expand-transition>
-            <div v-if="movie.movieCastVisible">
-              <v-divider />
-              <v-list-item
-                v-for="person in movie.credits.cast.slice(0, 9)"
-                :key="person.id"
-                :subtitle="person.character"
-                :title="person.name"
-              />
-            </div>
-          </v-expand-transition> -->
-
           <v-dialog v-model="movie.movieCastVisible" width="auto">
-            <v-card prepend-icon="mdi-account-group" :subtitle="getDirector(movie)" :title="movie.title">
+            <v-card prepend-icon="mdi-account-group" :subtitle="movie.director" :title="movie.title">
               <v-list-item
                 v-for="person in movie.credits.cast.slice(0, 9)"
                 :key="person.id"
@@ -74,13 +57,6 @@
               />
             </v-card>
           </v-dialog>
-
-          <!-- <v-expand-transition>
-            <div v-if="movie.oscarsVisible">
-              <v-divider />
-              {{ analyzeOscars(movie.oscars) }}
-            </div>
-          </v-expand-transition> -->
 
           <v-dialog v-model="movie.oscarsVisible" width="auto">
             <v-card prepend-icon="mdi-trophy"><v-card-text><pre>{{ formatOscarResults(analyzeOscars(movie.oscars)) }}</pre></v-card-text></v-card>
@@ -109,6 +85,7 @@
     movies.value = data
 
     for (const movie of movies.value) {
+      getDirector(movie)
       getDetails(movie)
       getOscars(movie)
     }
@@ -124,12 +101,56 @@
   function movieNumber (index) {
     return movies.value.length - index
   }
+  async function getDetails (movie) {
+    if (!movie.poster_path || !movie.release_date || !movie.runtime || !movie.genres) {
+      const options = {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          Authorization: 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiNTY5Y2Y4ZTIyZTlmYTRiOWZkMGQzY2RhNzdlOGExZSIsIm5iZiI6MTc2MDcyMjE3Mi4wMjMsInN1YiI6IjY4ZjI3Y2ZjZjg4NzEyMjg3ZmVjNWMxZCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.GljyKUapeItmVRL7SgnNHWU0Z9WacUn2MN0rfQFcD7w',
+        },
+      }
 
-  function getDirector (movie) {
-    return movie.credits.crew.find(person => person.job
-      === 'Director').name
+      const response = await fetch(`https://api.themoviedb.org/3/movie/${movie.tmdb_id}?language=en-US`, options)
+        .catch(error => console.error(error))
+
+      if (!response) {
+        throw new Error('Could not fetch resource.')
+      }
+
+      const data = await response.json()
+      if (!movie.poster_path) {
+        const { error } = await supabase.from('pbj-movies').update({ poster_path: `https://image.tmdb.org/t/p/original${data.poster_path}` }).eq('tmdb_id', movie.tmdb_id)
+      } else if (!movie.release_date) {
+        const { error } = await supabase.from('pbj-movies').update({ release_date: data.release_date.slice(0, 4) }).eq('tmdb_id', movie.tmdb_id)
+      } else if (!movie.runtime) {
+        const { error } = await supabase.from('pbj-movies').update({ runtime: data.runtime }).eq('tmdb_id', movie.tmdb_id)
+      } else if (!movie.genres) {
+        const { error } = await supabase.from('pbj-movies').update({ genres: data.genres }).eq('tmdb_id', movie.tmdb_id)
+      }
+    }
   }
 
+  async function getDirector (movie) {
+    if (!movie.director) {
+      const movieDirector = movie.credits.crew.find(person => person.job
+        === 'Director').name
+
+      const { error } = await supabase.from('pbj-movies').update({ director: movieDirector }).eq('tmdb_id', movie.tmdb_id)
+    }
+  }
+  async function getOscars (movie) {
+    if (!movie.oscars) {
+      const response = await fetch(`https://web-production-b8145.up.railway.app/awards/tmdb/${movie.tmdb_id}`).catch(error => console.error(error))
+      if (!response) {
+        throw new Error('Could not fetch Oscar noms and awards.')
+      }
+      const data = await response.json()
+      // console.log(data)
+
+      const { error } = await supabase.from('pbj-movies').update({ oscars: data }).eq('tmdb_id', movie.tmdb_id)
+    }
+  }
   function analyzeOscars (data) {
     const wins = data.filter(item => item.isWinner === '1')
     const allNominations = data // All entries are nominations (wins are nominations that won)
@@ -200,50 +221,6 @@
     }
 
     return output
-  }
-
-  async function getDetails (movie) {
-    if (!movie.poster_path || !movie.release_date || !movie.runtime || !movie.genres) {
-      const options = {
-        method: 'GET',
-        headers: {
-          accept: 'application/json',
-          Authorization: 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiNTY5Y2Y4ZTIyZTlmYTRiOWZkMGQzY2RhNzdlOGExZSIsIm5iZiI6MTc2MDcyMjE3Mi4wMjMsInN1YiI6IjY4ZjI3Y2ZjZjg4NzEyMjg3ZmVjNWMxZCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.GljyKUapeItmVRL7SgnNHWU0Z9WacUn2MN0rfQFcD7w',
-        },
-      }
-
-      const response = await fetch(`https://api.themoviedb.org/3/movie/${movie.tmdb_id}?language=en-US`, options)
-        .catch(error => console.error(error))
-
-      if (!response) {
-        throw new Error('Could not fetch resource.')
-      }
-
-      const data = await response.json()
-      if (!movie.poster_path) {
-        const { error } = await supabase.from('pbj-movies').update({ poster_path: `https://image.tmdb.org/t/p/original${data.poster_path}` }).eq('tmdb_id', movie.tmdb_id)
-      } else if (!movie.release_date) {
-        // console.log(data.release_date).slice(0, 3)
-        const { error } = await supabase.from('pbj-movies').update({ release_date: data.release_date.slice(0, 4) }).eq('tmdb_id', movie.tmdb_id)
-      } else if (!movie.runtime) {
-        const { error } = await supabase.from('pbj-movies').update({ runtime: data.runtime }).eq('tmdb_id', movie.tmdb_id)
-      } else if (!movie.genres) {
-        const { error } = await supabase.from('pbj-movies').update({ genres: data.genres }).eq('tmdb_id', movie.tmdb_id)
-      }
-    }
-  }
-
-  async function getOscars (movie) {
-    if (!movie.oscars) {
-      const response = await fetch(`https://web-production-b8145.up.railway.app/awards/tmdb/${movie.tmdb_id}`).catch(error => console.error(error))
-      if (!response) {
-        throw new Error('Could not fetch Oscar noms and awards.')
-      }
-      const data = await response.json()
-      // console.log(data)
-
-      const { error } = await supabase.from('pbj-movies').update({ oscars: data }).eq('tmdb_id', movie.tmdb_id)
-    }
   }
 
   onMounted(() => {
