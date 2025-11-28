@@ -1,6 +1,7 @@
 <template>
   <div class="my-4 text-center justify-center ">
-    <h1 class="text-h4 font-weight-bold">PBJ FILMS (v2)</h1>
+    <h1 class="text-h4 font-weight-bold">PBJ FILMS (v2) </h1>
+    <!-- <FlagIcon circle code="us" size="32" /> -->
   </div>  <!-- <v-img class="mb-4" height="150" src="@/assets/logo.png" /> -->
   <v-container fluid>
     <v-row align="center" class="fill-height" justify="center">
@@ -24,34 +25,34 @@
           <!-- <v-card-title class="d-inline-block text-truncate">{{ movie.title }}</v-card-title> -->
           <!-- <v-card-title class="d-inline-block text-truncate">{{ movie.tmdb_id }}</v-card-title> -->
 
-          <v-card-subtitle>{{ getDirector(movie) }}
+          <v-card-subtitle><v-badge :content="getDirector(movie)" inline><v-icon icon="mdi-movie-open" /></v-badge>
           </v-card-subtitle>
 
           <v-badge v-if="movie.release_date" color="primary" :content="movie.release_date" inline>
             <v-icon icon="mdi-cake" />
           </v-badge>
 
-          <div class="d-flex ga-12 justify-center mb-2">
-            <v-badge
-              bordered
-              color="success"
-              :content="movie.date_watched"
-              inline
-              location="right center"
-            >
-              <v-icon icon="mdi-calendar" />
-            </v-badge>
-          </div>
+          <v-badge
+            bordered
+            color="success"
+            :content="movie.date_watched"
+            inline
+            location="right center"
+          >
+            <v-icon icon="mdi-calendar" />
+          </v-badge>
 
-          <v-chip color="secondary">{{ movieNumber(index) }}</v-chip>
+          <v-badge color="secondary" :content="movieNumber(index)" inline><v-icon icon="counter" /></v-badge>
+
+          <!-- <v-chip color="secondary">{{ movieNumber(index) }}</v-chip> -->
 
           <v-card-actions class="justify-center">
-            <v-btn class="text-amber" text="Show Cast" @click="onShowCastClick(movie)" />
-            <v-btn :style="movie.oscars ? 'color:teal' : 'color:amber'" text="Show Oscars" @click="onShowOscarsClick(movie)" />
+            <v-btn class="text-amber" icon="mdi-account-group" @click="onShowCastClick(movie)" />
+            <v-btn v-if="movie.oscars" class="text-teal" icon="mdi-trophy" @click="onShowOscarsClick(movie)" />
 
           </v-card-actions>
 
-          <v-expand-transition>
+          <!-- <v-expand-transition>
             <div v-if="movie.movieCastVisible">
               <v-divider />
               <v-list-item
@@ -61,7 +62,18 @@
                 :title="person.name"
               />
             </div>
-          </v-expand-transition>
+          </v-expand-transition> -->
+
+          <v-dialog v-model="movie.movieCastVisible" width="auto">
+            <v-card prepend-icon="mdi-account-group" :subtitle="getDirector(movie)" :title="movie.title">
+              <v-list-item
+                v-for="person in movie.credits.cast.slice(0, 9)"
+                :key="person.id"
+                :subtitle="person.character"
+                :title="person.name"
+              />
+            </v-card>
+          </v-dialog>
 
           <!-- <v-expand-transition>
             <div v-if="movie.oscarsVisible">
@@ -83,6 +95,7 @@
 </template>
 
 <script setup>
+  import FlagIcon from 'vue3-flag-icons'
   import { supabase } from '../utils/supabase'
   const movies = ref([])
   // const page = ref(1)
@@ -190,7 +203,7 @@
   }
 
   async function getDetails (movie) {
-    if (!movie.poster_path || !movie.release_date) {
+    if (!movie.poster_path || !movie.release_date || !movie.runtime || !movie.genres) {
       const options = {
         method: 'GET',
         headers: {
@@ -212,6 +225,10 @@
       } else if (!movie.release_date) {
         // console.log(data.release_date).slice(0, 3)
         const { error } = await supabase.from('pbj-movies').update({ release_date: data.release_date.slice(0, 4) }).eq('tmdb_id', movie.tmdb_id)
+      } else if (!movie.runtime) {
+        const { error } = await supabase.from('pbj-movies').update({ runtime: data.runtime }).eq('tmdb_id', movie.tmdb_id)
+      } else if (!movie.genres) {
+        const { error } = await supabase.from('pbj-movies').update({ genres: data.genres }).eq('tmdb_id', movie.tmdb_id)
       }
     }
   }
