@@ -47,10 +47,14 @@
 
           </v-card-actions>
 
+          <div class="d-flex justify-center ga-2 mt-2">
+            <v-chip v-for="genre in movie.genres" :key="genre.id" color="secondary" variant="flat">{{ genre.name }}</v-chip>
+          </div>
+
           <v-dialog v-model="movie.movieCastVisible" width="auto">
             <v-card prepend-icon="mdi-account-group" :subtitle="movie.director" :title="movie.title">
               <v-list-item
-                v-for="person in movie.credits.cast.slice(0, 9)"
+                v-for="person in movie.credits.cast.slice(0, 15)"
                 :key="person.id"
                 :subtitle="person.character"
                 :title="person.name"
