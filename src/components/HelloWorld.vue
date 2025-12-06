@@ -5,10 +5,11 @@
   </div>
   <v-container fluid>
     <v-row align="center" class="fill-height" justify="center">
+
       <v-col class="d-flex flex-wrap" cols="12" justify="around">
 
         <v-card
-          v-for="(movie, index) in movies"
+          v-for="(movie, index) in paginatedMovies"
           :key="movie.tmdb_id"
           align="center"
           class="mx-auto"
@@ -63,13 +64,25 @@
           </v-dialog>
 
           <v-dialog v-model="movie.oscarsVisible" width="auto">
-            <v-card prepend-icon="mdi-trophy"><v-card-text><pre>{{ formatOscarResults(analyzeOscars(movie.oscars)) }}</pre></v-card-text></v-card>
+            <v-card prepend-icon="mdi-trophy">
+              <v-card-text>
+                <pre>{{ formatOscarResults(analyzeOscars(movie.oscars)) }}</pre>
+              </v-card-text>
+            </v-card>
           </v-dialog>
 
           <v-list-item />
         </v-card>
       </v-col>
+
     </v-row>
+    <v-pagination
+      v-model="page"
+      class="my-4"
+      :length="pageLength"
+      :total-visible="itemsPerPage"
+    />
+
   </v-container>
 
 </template>
@@ -78,8 +91,11 @@
   import FlagIcon from 'vue3-flag-icons'
   import { supabase } from '../utils/supabase'
   const movies = ref([])
-  // const page = ref(1)
-  // const itemsPerPage = ref(5)
+  const page = ref(1)
+  const itemsPerPage = 10
+  const pageLength = computed(() => {
+    return Math.ceil(movies.value.length / itemsPerPage)
+  })
 
   // const pageCount = computed(() => {
   //   return Math.ceil(movies.value.length / itemsPerPage.value)
@@ -93,15 +109,14 @@
       getDetails(movie)
       getOscars(movie)
     }
+    console.log(pageLength.value)
   }
   function onShowCastClick (movie) {
     movie.movieCastVisible = !movie.movieCastVisible
   }
-
   function onShowOscarsClick (movie) {
     movie.oscarsVisible = !movie.oscarsVisible
   }
-
   function movieNumber (index) {
     return movies.value.length - index
   }
@@ -134,7 +149,6 @@
       }
     }
   }
-
   async function getDirector (movie) {
     if (!movie.director) {
       const movieDirector = movie.credits.crew.find(person => person.job
@@ -190,7 +204,6 @@
       actingWins: actingWins,
     }
   }
-
   function formatOscarResults (results) {
     let output = '=== OSCAR ANALYSIS ===\n\n'
 
@@ -220,12 +233,16 @@
           output += `  • ${win.category}: ${win.names.join(', ')}\n`
         }
       }
-    } else {
-      output += 'No wins\n'
     }
 
     return output
   }
+
+  const paginatedMovies = computed(() => {
+    const start = (page.value - 1) * itemsPerPage
+    const end = start + itemsPerPage
+    return movies.value.slice(start, end)
+  })
 
   onMounted(() => {
     getMovies()
