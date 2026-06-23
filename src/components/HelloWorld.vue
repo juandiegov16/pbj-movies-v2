@@ -116,7 +116,7 @@
     movie.oscarsVisible = !movie.oscarsVisible
   }
   function movieNumber (index) {
-    return movies.value.length - index
+    return movies.value.length - (index + ((page.value - 1) * itemsPerPage))
   }
 
   async function getCredits (movie) {
