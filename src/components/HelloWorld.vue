@@ -97,16 +97,14 @@
     return Math.ceil(movies.value.length / itemsPerPage)
   })
 
-  // const pageCount = computed(() => {
-  //   return Math.ceil(movies.value.length / itemsPerPage.value)
-  // })
   async function getMovies () {
     const { data } = await supabase.from('pbj-movies').select().order('date_watched', { ascending: false })
     movies.value = data
 
     for (const movie of movies.value) {
-      getDirector(movie)
+      getCredits(movie)
       getDetails(movie)
+      getDirector(movie)
       getOscars(movie)
     }
     console.log(pageLength.value)
@@ -120,8 +118,32 @@
   function movieNumber (index) {
     return movies.value.length - index
   }
+
+  async function getCredits (movie) {
+    if (!movie.credits) {
+      const options = {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          Authorization: 'Bearer eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJiNTY5Y2Y4ZTIyZTlmYTRiOWZkMGQzY2RhNzdlOGExZSIsIm5iZiI6MTc2MDcyMjE3Mi4wMjMsInN1YiI6IjY4ZjI3Y2ZjZjg4NzEyMjg3ZmVjNWMxZCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.GljyKUapeItmVRL7SgnNHWU0Z9WacUn2MN0rfQFcD7w',
+        },
+      }
+
+      const response = await fetch(`https://api.themoviedb.org/3/movie/${movie.tmdb_id}/credits`, options)
+        .catch(error => console.error(error))
+
+      if (!response) {
+        throw new Error('Could not fetch resource.')
+      }
+
+      const data = await response.json()
+      if (!movie.credits) {
+        const { error } = await supabase.from('pbj-movies').update({ credits: data }).eq('tmdb_id', movie.tmdb_id)
+      }
+    }
+  }
   async function getDetails (movie) {
-    if (!movie.poster_path || !movie.release_date || !movie.runtime || !movie.genres || !movie.credits) {
+    if (!movie.poster_path || !movie.release_date || !movie.runtime || !movie.genres) {
       const options = {
         method: 'GET',
         headers: {
@@ -146,8 +168,6 @@
         const { error } = await supabase.from('pbj-movies').update({ runtime: data.runtime }).eq('tmdb_id', movie.tmdb_id)
       } else if (!movie.genres) {
         const { error } = await supabase.from('pbj-movies').update({ genres: data.genres }).eq('tmdb_id', movie.tmdb_id)
-      } else if (!movie.credits) {
-        const { error } = await supabase.from('pbj-movies').update({ credits: data.credits }).eq('tmdb_id', movie.tmdb_id)
       }
     }
   }
@@ -216,7 +236,7 @@
     }
 
     if (results.actingNominations.length > 0) {
-      output += '\nActing Nominations:\n'
+      output += '\nActing/Directing Nominations:\n'
       for (const nom of results.actingNominations) {
         output += `  • ${nom.category}: ${nom.names.join(', ')}\n`
       }
@@ -230,7 +250,7 @@
       }
 
       if (results.actingWins.length > 0) {
-        output += '\nActing Wins:\n'
+        output += '\nActing/Directing Wins:\n'
         for (const win of results.actingWins) {
           output += `  • ${win.category}: ${win.names.join(', ')}\n`
         }
