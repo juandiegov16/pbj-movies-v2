@@ -121,7 +121,7 @@
     return movies.value.length - index
   }
   async function getDetails (movie) {
-    if (!movie.poster_path || !movie.release_date || !movie.runtime || !movie.genres) {
+    if (!movie.poster_path || !movie.release_date || !movie.runtime || !movie.genres || !movie.credits) {
       const options = {
         method: 'GET',
         headers: {
@@ -146,6 +146,8 @@
         const { error } = await supabase.from('pbj-movies').update({ runtime: data.runtime }).eq('tmdb_id', movie.tmdb_id)
       } else if (!movie.genres) {
         const { error } = await supabase.from('pbj-movies').update({ genres: data.genres }).eq('tmdb_id', movie.tmdb_id)
+      } else if (!movie.credits) {
+        const { error } = await supabase.from('pbj-movies').update({ credits: data.credits }).eq('tmdb_id', movie.tmdb_id)
       }
     }
   }
