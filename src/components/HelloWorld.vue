@@ -4,31 +4,50 @@
     <!-- <FlagIcon circle code="us" size="32" /> -->
   </div>
 
+  <div v-if="selectedGenres.length > 0" class="d-flex align-center ga-2 mb-4">
+    <span class="text-caption">Filtering by:</span>
+
+    <v-chip
+      v-for="id in selectedGenres"
+      :key="id"
+      closable
+      color="secondary"
+      @click:close="toggleGenre(id)"
+    >
+      {{ genreNames[id] }}
+    </v-chip>
+
+    <v-btn size="small" text="Clear all" variant="text" @click="selectedGenres = []" />
+  </div>
+
   <v-container fluid>
-    <v-row align="center" class="fill-height" justify="center">
+    <div class="movie-grid">
+      <v-card v-for="(movie, index) in paginatedMovies" :key="movie.tmdb_id" class="movie-card">
+        <v-img
+          v-if="movie.poster_path"
+          class="mx-auto pa-2 ma-2"
+          cover
+          height="450px"
+          :src="movie.poster_path"
+          width="300px"
+        />
 
-      <v-col class="d-flex flex-wrap" cols="12" justify="around">
-
-        <v-card v-for="(movie, index) in paginatedMovies" :key="movie.tmdb_id" align="center" class="mx-auto">
-          <v-img
-            v-if="movie.poster_path"
-            class="mx-auto pa-2 ma-2"
-            cover
-            height="450px"
-            :src="movie.poster_path"
-            width="300px"
-          />
-
-          <v-card-subtitle v-if="movie.director"><v-badge :content="movie.director" inline><v-icon
-            icon="mdi-movie-open"
-          /></v-badge>
+        <div class="d-flex justify-center">
+          <v-card-subtitle v-if="movie.director">
+            <v-badge :content="movie.director" inline>
+              <v-icon icon="mdi-movie-open" />
+            </v-badge>
           </v-card-subtitle>
+        </div>
 
+        <div class="d-flex flex-wrap justify-center align-center ga-2 mt-1">
           <v-badge v-if="movie.release_date" color="primary" :content="movie.release_date" inline>
             <v-icon icon="mdi-cake" />
           </v-badge>
 
-          <v-badge color="warning" :content="`${movie.runtime} min`" inline><v-icon icon="mdi-clock" /></v-badge>
+          <v-badge color="warning" :content="`${movie.runtime} min`" inline>
+            <v-icon icon="mdi-clock" />
+          </v-badge>
 
           <v-badge
             bordered
@@ -40,73 +59,95 @@
             <v-icon icon="mdi-calendar" />
           </v-badge>
 
-          <v-badge color="secondary" :content="movieNumber(index)" inline><v-icon icon="mdi-counter" /></v-badge>
+          <v-badge color="secondary" :content="movieNumber(index)" inline>
+            <v-icon icon="mdi-counter" />
+          </v-badge>
+        </div>
 
-          <v-card-actions class="justify-center">
-            <v-btn class="text-amber" icon="mdi-account-group" @click="onShowCastClick(movie)" />
+        <v-card-actions class="justify-center">
+          <v-btn class="text-amber" icon="mdi-account-group" @click="onShowCastClick(movie)" />
 
-            <v-btn v-if="movie.oscars?.nominations?.length" class="text-teal" icon="mdi-trophy" @click="onShowOscarsClick(movie)" />
+          <v-btn
+            v-if="movie.oscars?.nominations?.length"
+            class="text-teal"
+            icon="mdi-trophy"
+            @click="onShowOscarsClick(movie)"
+          />
+        </v-card-actions>
 
-            <v-dialog v-model="oscarsDialog" max-width="500">
-              <v-card v-if="selectedMovieForOscars">
-                <v-card-title>{{ selectedMovieForOscars.title }} ({{ selectedMovieForOscars.release_date }}): Oscars</v-card-title>
+        <div class="d-flex flex-wrap justify-center ga-2 mt-auto pt-2 pb-3">
+          <v-chip
+            v-for="genre in movie.genres"
+            :key="genre.id"
+            :aria-pressed="isGenreActive(genre.id)"
+            class="genre-badge"
+            :class="{ 'genre-badge--off': selectedGenres.length > 0 && !isGenreActive(genre.id) }"
+            color="secondary"
+            role="button"
+            tabindex="0"
+            :text="genre.name"
+            @click.stop="toggleGenre(genre.id)"
+            @keydown.enter.stop="toggleGenre(genre.id)"
+          />
+        </div>
+      </v-card>
+    </div>
 
-                <v-card-text>
-                  <v-list lines="two">
-                    <v-list-item v-for="g in groupedNominations" :key="g.key">
-                      <template #prepend>
-                        <v-icon
-                          :color="g.winner ? 'amber' : undefined"
-                          :icon="g.winner ? 'mdi-trophy' : 'mdi-trophy-outline'"
-                        />
-                      </template>
+    <!-- dialogs: once, outside the grid and the v-for -->
+    <v-dialog v-model="oscarsDialog" max-width="500">
+      <v-card v-if="selectedMovieForOscars">
+        <v-card-title>
+          {{ selectedMovieForOscars.title }} ({{ selectedMovieForOscars.release_date }}): Oscars
+        </v-card-title>
 
-                      <v-list-item-title>{{ g.category }}</v-list-item-title>
+        <v-card-text>
+          <v-list lines="two">
+            <v-list-item v-for="g in groupedNominations" :key="g.key">
+              <template #prepend>
+                <v-icon
+                  :color="g.winner ? 'amber' : undefined"
+                  :icon="g.winner ? 'mdi-trophy' : 'mdi-trophy-outline'"
+                />
+              </template>
 
-                      <v-list-item-subtitle>
-                        {{ g.ceremony_year }} ceremony · {{ g.winner ? 'Won' : 'Nominated' }}
-                        <br>
-                        {{ g.nominees.join(', ') }}
-                      </v-list-item-subtitle>
-                    </v-list-item>
-                  </v-list>
-                </v-card-text>
+              <v-list-item-title>{{ g.category }}</v-list-item-title>
 
-                <v-card-actions>
-                  <v-spacer />
-                  <v-btn text="Close" @click="oscarsDialog = false" />
-                </v-card-actions>
-              </v-card>
-            </v-dialog>
+              <v-list-item-subtitle>
+                {{ g.ceremony_year }} ceremony · {{ g.winner ? 'Won' : 'Nominated' }}
+                <br>
+                {{ g.nominees.join(', ') }}
+              </v-list-item-subtitle>
+            </v-list-item>
+          </v-list>
+        </v-card-text>
 
-          </v-card-actions>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn text="Close" @click="oscarsDialog = false" />
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
-          <div class="d-flex justify-center ga-2 mt-2">
-            <v-chip v-for="genre in movie.genres" :key="genre.id" color="secondary" variant="flat">{{ genre.name
-            }}</v-chip>
-          </div>
+    <v-dialog v-model="castDialog" max-width="500">
+      <v-card
+        v-if="selectedMovieForCast"
+        prepend-icon="mdi-account-group"
+        :subtitle="selectedMovieForCast.director"
+        :title="selectedMovieForCast.title"
+      >
+        <v-list-item
+          v-for="person in selectedMovieForCast.credits.cast.slice(0, 7)"
+          :key="person.id"
+          :subtitle="person.character"
+          :title="person.name"
+        />
 
-          <v-dialog v-model="castDialog" max-width="500">
-            <v-card v-if="selectedMovieForCast" prepend-icon="mdi-account-group" :subtitle="selectedMovieForCast.director" :title="selectedMovieForCast.title">
-              <v-list-item
-                v-for="person in selectedMovieForCast.credits.cast.slice(0, 7)"
-                :key="person.id"
-                :subtitle="person.character"
-                :title="person.name"
-              />
-
-              <v-card-actions>
-                <v-spacer />
-                <v-btn text="Close" @click="castDialog = false" />
-              </v-card-actions>
-            </v-card>
-          </v-dialog>
-
-          <v-list-item />
-        </v-card>
-      </v-col>
-
-    </v-row>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn text="Close" @click="castDialog = false" />
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <v-pagination v-model="page" class="my-4" :length="pageLength" :total-visible="itemsPerPage" />
 
@@ -119,19 +160,53 @@
 </template>
 
 <script setup>
+  import { watch } from 'vue'
   // import FlagIcon from 'vue3-flag-icons'
   import { supabase } from '../utils/supabase'
   const movies = ref([])
   const page = ref(1)
-  const itemsPerPage = 10
+  const itemsPerPage = 20
+  const filteredMovies = computed(() => {
+    if (selectedGenres.value.length === 0) return movies.value
+    return movies.value.filter(m =>
+      selectedGenres.value.every(id => m.genres?.some(g => g.id === id)),
+    )
+  })
+
   const pageLength = computed(() => {
-    return Math.ceil(movies.value.length / itemsPerPage)
+    return Math.max(1, Math.ceil(filteredMovies.value.length / itemsPerPage))
+  })
+  const paginatedMovies = computed(() => {
+    const start = (page.value - 1) * itemsPerPage
+    const end = start + itemsPerPage
+    return filteredMovies.value.slice(start, end)
   })
   const loadingOscars = ref(false)
   const oscarsDialog = ref(false)
   const castDialog = ref(false)
   const selectedMovieForCast = ref(null)
   const selectedMovieForOscars = ref(null)
+  const selectedGenres = ref([]) // genre ids
+
+  watch(selectedGenres, () => {
+    page.value = 1
+  })
+
+  function isGenreActive (id) {
+    return selectedGenres.value.includes(id)
+  }
+
+  function toggleGenre (id) {
+    selectedGenres.value = isGenreActive(id)
+      ? selectedGenres.value.filter(g => g !== id)
+      : [...selectedGenres.value, id]
+  }
+
+  const genreNames = computed(() => {
+    const map = {}
+    for (const m of movies.value) for (const g of m.genres ?? []) map[g.id] = g.name
+    return map
+  })
 
   async function loadOscars () {
     loadingOscars.value = true
@@ -165,6 +240,7 @@
     selectedMovieForOscars.value = movie
     oscarsDialog.value = true
   }
+
   const groupedNominations = computed(() =>
     selectedMovieForOscars.value ? groupNominations(selectedMovieForOscars.value.oscars) : [],
   )
@@ -194,7 +270,7 @@
   }
 
   function movieNumber (index) {
-    return movies.value.length - (index + ((page.value - 1) * itemsPerPage))
+    return filteredMovies.value.length - (index + ((page.value - 1) * itemsPerPage))
   }
 
   async function getCredits (movie) {
@@ -238,14 +314,42 @@
       }
 
       const data = await response.json()
-      if (!movie.poster_path) {
-        const { error } = await supabase.from('pbj-movies').update({ poster_path: `https://image.tmdb.org/t/p/original${data.poster_path}` }).eq('tmdb_id', movie.tmdb_id)
-      } else if (!movie.release_date) {
-        const { error } = await supabase.from('pbj-movies').update({ release_date: data.release_date.slice(0, 4) }).eq('tmdb_id', movie.tmdb_id)
-      } else if (!movie.runtime) {
-        const { error } = await supabase.from('pbj-movies').update({ runtime: data.runtime }).eq('tmdb_id', movie.tmdb_id)
-      } else if (!movie.genres) {
-        const { error } = await supabase.from('pbj-movies').update({ genres: data.genres }).eq('tmdb_id', movie.tmdb_id)
+      const updates = {}
+
+      if (!movie.poster_path && data.poster_path) {
+        updates.poster_path = `https://image.tmdb.org/t/p/original${data.poster_path}`
+      }
+      if (!movie.release_date && data.release_date) {
+        updates.release_date = data.release_date.slice(0, 4)
+      }
+      if (!movie.runtime && data.runtime) {
+        updates.runtime = data.runtime
+      }
+      if (!movie.genres && data.genres) {
+        updates.genres = data.genres
+      }
+
+      const fields = Object.keys(updates)
+
+      if (fields.length === 0) {
+        console.log(`TMDB ${movie.tmdb_id}: nothing to update`)
+      } else {
+        console.log(`TMDB ${movie.tmdb_id}: fetched ${fields.join(', ')}`)
+
+        const { data: saved, error } = await supabase
+          .from('pbj-movies')
+          .update(updates)
+          .eq('tmdb_id', movie.tmdb_id)
+          .select('tmdb_id') // returns the rows actually updated
+
+        if (error) {
+          console.error(`TMDB ${movie.tmdb_id}: save failed`, error.message)
+        } else if (saved?.length) {
+          Object.assign(movie, updates) // keep local state in sync
+          console.log(`TMDB ${movie.tmdb_id}: saved ${fields.join(', ')}`)
+        } else {
+          console.error(`TMDB ${movie.tmdb_id}: update matched 0 rows (check RLS policy and id type)`)
+        }
       }
     }
   }
@@ -330,16 +434,36 @@
     return failed
   }
 
-  const paginatedMovies = computed(() => {
-    const start = (page.value - 1) * itemsPerPage
-    const end = start + itemsPerPage
-    return movies.value.slice(start, end)
-  })
-
   onMounted(() => {
     getMovies()
     loadOscars()
   })
 </script>
 
-<style scoped></style>
+<style scoped>
+.movie-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  padding: 16px;
+}
+
+.movie-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.genre-badge {
+  cursor: pointer;
+  user-select: none;
+  transition: opacity 0.15s;
+}
+.genre-badge:hover {
+  opacity: 0.85;
+}
+.genre-badge--off {
+  opacity: 0.4;
+}
+
+</style>
